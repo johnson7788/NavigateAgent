@@ -1,0 +1,27 @@
+# 搜索工具配置
+SEARCH_TOKEN=xxxx
+
+GOOGLE_API_KEY=xxxx
+DEEPSEEK_API_KEY=sk-xxxx
+ALI_API_KEY=sk-xxxx
+MODEL_PROVIDER=openai
+LLM_MODEL=gpt-4.1
+OPENAI_API_BASE=https://api.openai.com/v1
+CLAUDE_API_KEY=sk-ant-api03-xxxx
+DOUBAO_API_KEY=xxxxx
+OPENAI_API_KEY=sk-proj-xxxx
+
+# LLM 配置
+# LLM_API_KEY=sk-xxxxx
+# LLM_BASE_URL=https://api.openai.com/v1
+# LLM_MODEL=gpt-4o
+# LLM 配置
+LLM_API_KEY=sk-xxxx
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
+
+
+# 模型蒸馏，教师模型
+TEACHER_API_KEY=sk-xxxx
+TEACHER_MODEL=deepseek-chat
+TEACHER_BASE_URL=https://api.deepseek.com/v1

@@ -1,0 +1,66 @@
+name: navi-Agent
+
+services:
+  navi_main:
+    container_name: navi_main
+    build:
+      context: ./backend/main_api
+      dockerfile: Dockerfile
+    ports:
+      - "10069:10069"
+    env_file:
+      - ./frontend/.env
+    network_mode: bridge
+    restart: unless-stopped
+
+  navi_ppt:
+    container_name: navi_ppt
+    build:
+      context: ./backend/pptagent
+      dockerfile: Dockerfile
+    ports:
+      - "10071:10071"
+    env_file:
+      - ./frontend/.env
+    network_mode: bridge
+    restart: unless-stopped
+
+  navi_search:
+    container_name: navi_search
+    build:
+      context: ./backend/search_agent
+      dockerfile: Dockerfile
+    ports:
+      - "10080:10080"
+    env_file:
+      - ./frontend/.env
+    network_mode: bridge
+    restart: unless-stopped
+
+  navi_subagent:
+    container_name: navi_subagent
+    build:
+      context: ./backend/subagent_main
+      dockerfile: Dockerfile
+    ports:
+      - "10072:10072"
+    env_file:
+      - ./frontend/.env
+    network_mode: bridge
+    restart: unless-stopped
+
+  navi_frontend:
+    container_name: navi_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env
+    network_mode: bridge
+    restart: unless-stopped
+
+networks:
+  navi-net:
+    driver: bridge

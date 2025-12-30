@@ -1,0 +1,45 @@
+# 设置所有的服务的启动端口和url，供它们之间相互调用
+MAIN_API_PORT='10069'
+SEARCH_AGENT_PORT='10080'
+PPT_AGENT_PORT='10071'
+SUBAGENT_MAIN_PORT='10072'
+SEARCH_AGENT_URL=http://127.0.0.1:10080
+PPT_AGENT_URL=http://localhost:10071
+SUBAGENT_MAIN_PORT=http://localhost:10072
+
+
+# 一些模型的key
+GOOGLE_API_KEY=xxxx
+DEEPSEEK_API_KEY=xxx
+ALI_API_KEY=xxxx
+OPENAI_API_KEY=sk-xxx
+CLAUDE_API_KEY=sk-xxxx
+# 使用LLM的流式的响应，测试gemini的效果很好，true表示开启流的请求和响应
+STREAMING=true
+
+# 使用哪个模型作为Agent
+MODEL_PROVIDER=deepseek
+LLM_MODEL=deepseek-chat
+# LLM_MODEL=deepseek-reasoner
+# 是否使用代理，clash的代理7890
+# HTTP_PROXY=http://127.0.0.1:7890
+# HTTPS_PROXY=http://127.0.0.1:7890
+
+# 用于tool请求每个Agent
+RABBITMQ_HOST=127.0.0.1
+RABBITMQ_PORT=5672
+RABBITMQ_USERNAME=admin
+RABBITMQ_PASSWORD=welcome
+RABBITMQ_VIRTUAL_HOST=navi_agent
+# 从哪个队列中写入
+QUEUE_NAME_WRITER=naviagent_question
+# 从这里队列读取结果
+QUEUE_NAME_READ=naviagent_answer
+
+
+# 前端环境变量配置，nextjs读取后端内容
+# 后端 API 地址
+NEXT_PUBLIC_API_URL=http://127.0.0.1:10069
+
+# # 任务的API状态地址，对于任务卡片，执行进度信息等获取
+NEXT_PUBLIC_API_TASK=http://127.0.0.1:10072

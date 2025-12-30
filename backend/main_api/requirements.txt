@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+google-adk==1.20.0
+httpx
+a2a-sdk==0.2.10
+python-dotenv
+asyncclick
+pytest
+click
+pymongo
+elasticsearch==7.12.1
+numpy<2.0.0
+gunicorn

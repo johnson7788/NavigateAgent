@@ -1,0 +1,5 @@
+# 前端环境变量配置
+# 后端 API 地址
+NEXT_PUBLIC_API_URL=http://127.0.0.1:10069
+# 任务的API状态地址
+NEXT_PUBLIC_API_TASK=http://127.0.0.1:10072

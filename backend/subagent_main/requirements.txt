@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+httpx
+python-dotenv
+asyncclick
+pytest
+click
+pika
+google-genai
+google-adk==1.20.0
+a2a-sdk==0.2.10
+gunicorn
+websocket-client==1.8.0
+websockets==15.0.1

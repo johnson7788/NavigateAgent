@@ -1,0 +1,18 @@
+# RabbitMQ配置
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USERNAME=admin
+RABBITMQ_PASSWORD=welcome
+RABBITMQ_VIRTUAL_HOST=navi_agent
+
+# MQ队列配置（与naviagent保持一致）
+QUEUE_NAME_WRITER=question_queue
+QUEUE_NAME_READ=answer_queue
+
+# Agent URL配置
+TRANSLATOR_AGENT_URL=http://localhost:10073
+PPT_AGENT_URL=http://localhost:10071
+
+# 其他配置
+ZHIPU_API_KEY=xxxxx
+USE_WEB_SEARCH=zhipu
