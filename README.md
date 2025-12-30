@@ -14,6 +14,10 @@
 
 系统采用 **Agent + MQ + WebSocket + JSONCARD 协议** 架构，前端基于 **Next.js + TailwindCSS**，后端以 **FastAPI + Google ADK** 为核心。
 
+1. 可以作为1个总的智能体调用其它智能体，类似A2A，但是A2A需要等待子Agent的数据返回，所以我考虑仅仅使用主Agent触发子Agent，子Agent的结果使用卡片返回个前端。
+2. 可以采用LightningAgent进行强化学习训练，详细参考train_agent目录。
+
+
 ---
 
 ## 二、整体流程说明
