@@ -2,7 +2,7 @@
 memory_controller.py 
 读取传入的metada中的history，然后拼入event中，作为历史记录
 关键使用的代码：
-```mermaid
+```
 ## Step1，导入
 from memory_controller import MemoryController
 
@@ -48,7 +48,7 @@ class ADKAgentExecutor(AgentExecutor):
 
 ```
 
-# 支持thinking模型，例如Deepseek R1
+# 支持thinking模型，例如Deepseek R1(litellm还不支持，adk已经支持，所以还是会报错)
 1. 首先，升级adk为google-adk==1.20
 2. 然后处理thought字段
 [adk_agent_executor.py](adk_agent_executor.py)
