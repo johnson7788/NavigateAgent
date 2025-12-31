@@ -80,162 +80,230 @@ export const SearchInterface: React.FC = () => {
       let fullText = '';
       let functionCalls: any[] = [];
       let functionResponses: any[] = [];
+      let buffer = ''; // 缓冲区用于处理跨chunk的SSE数据
+      let chunkCounter = 0;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
+        chunkCounter++;
         const chunk = decoder.decode(value, { stream: true });
-        // The backend sends SSE formatted like "data: { ... }"
-        // We need to parse these lines.
-        const lines = chunk.split('\n\n');
-        
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
-                const jsonStr = line.slice(6);
-                if (jsonStr === '[DONE]') continue; // Standard SSE done
-                try {
-                    const data = JSON.parse(jsonStr);
-                    
-                    if (data.done) {
-                        // End of stream logic if explicitly sent
-                    } else if (data.text) {
-                        fullText += data.text;
+        buffer += chunk;
 
-                        // 检查是否是搜索工具调用过的消息
-                        const hasSearchCall = functionCalls.some(call =>
-                            call.name && call.name.startsWith('search_')
-                        );
+        // SSE标准：每个消息以换行符结尾，多个消息之间用两个换行符分隔
+        // 但数据内部可能包含换行符，所以我们需要更智能的分割
 
-                        if (hasSearchCall) {
-                            // 如果有搜索工具调用，只显示文本内容，不解析JSONCARD
-                            setMessages((prev) =>
-                                prev.map((msg) =>
-                                    msg.id === assistantId
-                                    ? { ...msg, content: fullText }
-                                    : msg
-                                )
-                            );
-                        } else {
-                            // 没有搜索工具调用时，继续解析JSONCARD
-                            const { cleanText, cards } = parseContentWithCards(fullText);
-                            // 根据卡片类型分别处理
-                            const searchCards: any[] = [];
-                            const taskCards: any[] = [];
-                            cards.forEach((card: any) => {
-                                if (card.type === 'task') {
-                                    taskCards.push(card);
-                                } else if (card.type === 'search_result') {
-                                    searchCards.push(card);
-                                }
-                            });
+        // 按双换行符分割，这表示SSE消息的边界
+        const parts = buffer.split('\n\n');
 
-                            setMessages((prev) =>
-                                prev.map((msg) =>
-                                    msg.id === assistantId
-                                    ? { 
-                                        ...msg, 
-                                        content: cleanText, 
-                                        // 分别更新两种卡片类型
-                                        search_cards: searchCards.length > 0 ? searchCards : (msg.search_cards || []),
-                                        task_cards: taskCards.length > 0 ? taskCards : (msg.task_cards || [])
-                                    }
-                                    : msg
-                                )
-                            );
-                        }
-                    } else if (data.function_call) {
-                        functionCalls.push(data.function_call);
-                        setMessages((prev) => 
-                            prev.map((msg) => 
-                                msg.id === assistantId 
-                                ? { ...msg, function_call: data.function_call } 
+        // 最后一个部分可能是不完整的，保持在缓冲区中
+        buffer = parts.pop() || '';
+
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+
+            // 跳过空消息
+            if (!part.trim()) continue;
+
+            // 检查是否是SSE数据行
+            if (!part.startsWith('data: ')) {
+                if (isDebugMode) {
+                    console.debug('[SSE] Skipping non-data line:', part.substring(0, 100));
+                }
+                continue;
+            }
+
+            const jsonStr = part.slice(6).trim();
+
+            // 处理 [DONE] 消息
+            if (jsonStr === '[DONE]') {
+                if (isDebugMode) {
+                    console.debug('[SSE] Received [DONE] signal');
+                }
+                continue;
+            }
+
+            if (isDebugMode) {
+                console.debug(`[SSE] Chunk #${chunkCounter}, length: ${jsonStr.length}, preview: ${jsonStr.substring(0, 200)}...`);
+            }
+
+            try {
+                const data = JSON.parse(jsonStr);
+
+                if (data.done) {
+                    if (isDebugMode) {
+                        console.debug('[SSE] Stream done flag received');
+                    }
+                } else if (data.text) {
+                    fullText += data.text;
+
+                    // 检查是否是搜索工具调用过的消息
+                    const hasSearchCall = functionCalls.some(call =>
+                        call.name && call.name.startsWith('search_')
+                    );
+
+                    if (hasSearchCall) {
+                        // 如果有搜索工具调用，只显示文本内容，不解析JSONCARD
+                        setMessages((prev) =>
+                            prev.map((msg) =>
+                                msg.id === assistantId
+                                ? { ...msg, content: fullText }
                                 : msg
                             )
                         );
-                    } else if (data.function_response) {
-                        functionResponses.push(data.function_response);
-
-                        // 如果是搜索工具响应，直接提取搜索结果并转换为卡片
-                        let searchCards: any[] = [];
-                        let taskCards: any[] = [];
-
-                        if (data.function_response.name && data.function_response.name.startsWith('search_')) {
-                            const searchResponse = data.function_response.response;
-                            if (searchResponse && searchResponse.records) {
-                                // 查找对应的搜索查询
-                                const searchCall = functionCalls.find(call => call.name === data.function_response.name);
-                                const query = searchCall?.args?.query_string || searchCall?.arguments?.query_string || '';
-
-                                // 创建搜索结果卡片
-                                searchCards = [{
-                                    type: 'search_result',
-                                    version: '1.0',
-                                    id: `search_${Date.now()}`,
-                                    payload: {
-                                        query: query,
-                                        records: searchResponse.records
-                                    }
-                                }];
-
-                                // 更新 searchResult 状态，保存最近的搜索记录
-                                setSearchResult(searchResponse.records);
+                    } else {
+                        // 没有搜索工具调用时，继续解析JSONCARD
+                        const { cleanText, cards } = parseContentWithCards(fullText);
+                        // 根据卡片类型分别处理
+                        const searchCards: any[] = [];
+                        const taskCards: any[] = [];
+                        cards.forEach((card: any) => {
+                            if (card.type === 'task') {
+                                taskCards.push(card);
+                            } else if (card.type === 'search_result') {
+                                searchCards.push(card);
                             }
-                        }
-                        // 如果是 translate_paper_tool 或 generate_ppt_tool，解析 JSONCARD
-                        else if (data.function_response.name === 'translate_paper_tool' || data.function_response.name === 'generate_ppt_tool') {
-                            const response = data.function_response.response;
-                            if (response && response.result) {
-                                // 解析 JSONCARD
-                                try {
-                                    const jsonCardStr = response.result;
-                                    // 提取 JSONCARD 内容（去掉 ```JSONCARD 和 ```）
-                                    const jsonMatch = jsonCardStr.match(/```JSONCARD\n([\s\S]*?)\n```/);
-                                    if (jsonMatch && jsonMatch[1]) {
-                                        const parsedCards = JSON.parse(jsonMatch[1]);
-                                        // 根据卡片类型分别添加到对应的数组
-                                        parsedCards.forEach((card: any) => {
-                                            if (card.type === 'task') {
-                                                taskCards.push(card);
-                                            } else if (card.type === 'search_result') {
-                                                searchCards.push(card);
-                                            }
-                                        });
-                                    }
-                                } catch (e) {
-                                    console.warn('Failed to parse JSONCARD:', e);
-                                }
-                            }
-                        }
+                        });
 
                         setMessages((prev) =>
                             prev.map((msg) =>
                                 msg.id === assistantId
                                 ? {
                                     ...msg,
-                                    function_response: data.function_response,
-                                    // 分别更新 search_cards 和 task_cards
-                                    search_cards: searchCards.length > 0 ? searchCards : (msg as Message).search_cards || [],
-                                    task_cards: taskCards.length > 0 ? [...(msg.task_cards || []), ...taskCards] : (msg.task_cards || [])
+                                    content: cleanText,
+                                    // 分别更新两种卡片类型
+                                    search_cards: searchCards.length > 0 ? searchCards : (msg.search_cards || []),
+                                    task_cards: taskCards.length > 0 ? taskCards : (msg.task_cards || [])
                                 }
                                 : msg
                             )
                         );
-                    } else if (data.error) {
-                        fullText += `\n\n*[Error: ${data.error}]*`;
-                         setMessages((prev) => 
-                            prev.map((msg) => 
-                                msg.id === assistantId 
-                                ? { ...msg, content: fullText, hasError: true } 
-                                : msg
-                            )
-                        );
                     }
-                } catch (e) {
-                    console.warn("Failed to parse SSE JSON chunk", e);
+                } else if (data.function_call) {
+                    functionCalls.push(data.function_call);
+                    if (isDebugMode) {
+                        console.debug('[SSE] Function call:', data.function_call.name);
+                    }
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantId
+                            ? { ...msg, function_call: data.function_call }
+                            : msg
+                        )
+                    );
+                } else if (data.function_response) {
+                    functionResponses.push(data.function_response);
+
+                    // 如果是搜索工具响应，直接提取搜索结果并转换为卡片
+                    let searchCards: any[] = [];
+                    let taskCards: any[] = [];
+
+                    if (data.function_response.name && data.function_response.name.startsWith('search_')) {
+                        const searchResponse = data.function_response.response;
+                        if (isDebugMode) {
+                            console.debug('[SSE] Search response received:', {
+                                name: data.function_response.name,
+                                hasRecords: !!searchResponse?.records,
+                                totalRecords: searchResponse?.total || 0
+                            });
+                        }
+                        if (searchResponse && searchResponse.records) {
+                            // 查找对应的搜索查询
+                            const searchCall = functionCalls.find(call => call.name === data.function_response.name);
+                            const query = searchCall?.args?.query_string || searchCall?.arguments?.query_string || '';
+
+                            // 创建搜索结果卡片
+                            searchCards = [{
+                                type: 'search_result',
+                                version: '1.0',
+                                id: `search_${Date.now()}`,
+                                payload: {
+                                    query: query,
+                                    records: searchResponse.records
+                                }
+                            }];
+
+                            // 更新 searchResult 状态，保存最近的搜索记录
+                            setSearchResult(searchResponse.records);
+                        }
+                    }
+                    // 如果是 translate_paper_tool 或 generate_ppt_tool，解析 JSONCARD
+                    else if (data.function_response.name === 'translate_paper_tool' || data.function_response.name === 'generate_ppt_tool') {
+                        const response = data.function_response.response;
+                        if (response && response.result) {
+                            // 解析 JSONCARD
+                            try {
+                                const jsonCardStr = response.result;
+                                // 提取 JSONCARD 内容（去掉 ```JSONCARD 和 ```）
+                                const jsonMatch = jsonCardStr.match(/```JSONCARD\n([\s\S]*?)\n```/);
+                                if (jsonMatch && jsonMatch[1]) {
+                                    const parsedCards = JSON.parse(jsonMatch[1]);
+                                    // 根据卡片类型分别添加到对应的数组
+                                    parsedCards.forEach((card: any) => {
+                                        if (card.type === 'task') {
+                                            taskCards.push(card);
+                                        } else if (card.type === 'search_result') {
+                                            searchCards.push(card);
+                                        }
+                                    });
+                                }
+                            } catch (e) {
+                                console.warn('Failed to parse JSONCARD:', e);
+                            }
+                        }
+                    }
+
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantId
+                            ? {
+                                ...msg,
+                                function_response: data.function_response,
+                                // 分别更新 search_cards 和 task_cards
+                                search_cards: searchCards.length > 0 ? searchCards : (msg as Message).search_cards || [],
+                                task_cards: taskCards.length > 0 ? [...(msg.task_cards || []), ...taskCards] : (msg.task_cards || [])
+                            }
+                            : msg
+                        )
+                    );
+                } else if (data.error) {
+                    fullText += `\n\n*[Error: ${data.error}]*`;
+                    console.error('[SSE] Error in stream:', data.error);
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantId
+                            ? { ...msg, content: fullText, hasError: true }
+                            : msg
+                        )
+                    );
+                }
+            } catch (e) {
+                console.warn("Failed to parse SSE JSON chunk", e);
+                if (isDebugMode) {
+                    console.debug('[SSE] Failed JSON:', jsonStr.substring(0, 500));
                 }
             }
         }
+      }
+
+      // 处理缓冲区中剩余的数据
+      if (buffer.trim() && buffer.startsWith('data: ')) {
+        if (isDebugMode) {
+            console.debug('[SSE] Processing remaining buffer:', buffer.substring(0, 200));
+        }
+        const jsonStr = buffer.slice(6).trim();
+        if (jsonStr && jsonStr !== '[DONE]') {
+            try {
+                JSON.parse(jsonStr);
+            } catch (e) {
+                console.warn("Failed to parse remaining buffer", e);
+            }
+        }
+      }
+
+      if (isDebugMode) {
+        console.debug('[SSE] Stream completed, total chunks:', chunkCounter);
       }
     } catch (error) {
       console.error('Error in search:', error);
